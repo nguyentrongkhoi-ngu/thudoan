@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  name           String?
+  email          String?         @unique
+  password       String?
+  image          String?
+  role           String          @default("user")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  emailVerified  DateTime?
+  accounts       Account[]
+  cartItems      CartItem[]
+  orders         Order[]
+  productViews   ProductView[]
+  returnRequests ReturnRequest[]
+  reviews        Review[]
+  searchQueries  SearchQuery[]
+  sessions       Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Product {
+  id           String         @id @default(cuid())
+  name         String         @unique
+  description  String?        @db.Text
+  price        Float
+  stock        Int
+  imageUrl     String?
+  categoryId   String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+  category     Category       @relation(fields: [categoryId], references: [id])
+  images       ProductImage[]
+  productViews ProductView[]
+  reviews      Review[]
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  imageUrl  String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  rating    Int
+  comment   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([productId])
+}
+
+model Category {
+  id             String     @id @default(cuid())
+  name           String     @unique
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  imageUrl       String?
+  sortOrder      Int        @default(0)
+  description    String?    @db.Text
+  parentId       String?
+  parentCategory Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subCategories  Category[] @relation("CategoryToCategory")
+  products       Product[]
+
+  @@index([parentId])
+}
+
+model Order {
+  id              String           @id @default(cuid())
+  userId          String
+  status          String           @default("PENDING")
+  total           Float
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  notes           String?          @db.Text
+  paymentMethod   String?
+  trackingNumber  String?
+  invoice         Invoice?
+  user            User             @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  returnRequests  ReturnRequest[]
+  shippingAddress ShippingAddress?
+}
+
+model ShippingAddress {
+  id          String  @id @default(cuid())
+  orderId     String  @unique
+  fullName    String
+  address     String
+  city        String
+  state       String?
+  postalCode  String?
+  country     String
+  phoneNumber String
+  order       Order   @relation(fields: [orderId], references: [id])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
+
+model ProductView {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  viewCount Int      @default(1)
+  duration  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
+
+model SearchQuery {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model ReturnRequest {
+  id        String       @id @default(cuid())
+  orderId   String
+  userId    String
+  status    String       @default("PENDING")
+  reason    String       @db.Text
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  items     ReturnItem[]
+  order     Order        @relation(fields: [orderId], references: [id], onUpdate: NoAction)
+  user      User         @relation(fields: [userId], references: [id], onUpdate: NoAction)
+
+  @@index([orderId])
+  @@index([userId])
+}
+
+model ReturnItem {
+  id              String        @id @default(cuid())
+  returnRequestId String
+  orderItemId     String
+  quantity        Int
+  reason          String?       @db.Text
+  status          String        @default("PENDING")
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+
+  @@index([returnRequestId])
+  @@index([orderItemId])
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  invoiceNumber String   @unique
+  pdfUrl        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  order         Order    @relation(fields: [orderId], references: [id])
+
+  @@index([invoiceNumber])
+}
+
+model Coupon {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  description     String?
+  discountPercent Int?
+  discountAmount  Float?
+  minOrderAmount  Float?
+  maxDiscount     Float?
+  isActive        Boolean  @default(true)
+  startDate       DateTime
+  endDate         DateTime
+  usageLimit      Int?
+  usageCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
